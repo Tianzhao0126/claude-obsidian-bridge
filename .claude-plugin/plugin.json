@@ -1,0 +1,13 @@
+{
+  "name": "claude-obsidian-bridge",
+  "version": "1.0.0-dev",
+  "description": "把 Claude Code 的 memory/rules/skills/plans 白盒化到 Obsidian vault, 支持决策追溯与知识提级",
+  "author": {
+    "name": "zhaotian",
+    "email": "jordanzt63@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": ["obsidian", "memory", "rules", "plan-trace", "white-box", "claude-code"],
+  "hooks": "./hooks/hooks.json",
+  "commands": "./commands/"
+}
