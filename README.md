@@ -19,7 +19,7 @@ AI agent (Claude Code) 默认是**黑盒**:
 ## 安装
 
 ```
-/plugin install zhaotian/claude-obsidian-bridge
+/plugin install Tianzhao0126/claude-obsidian-bridge
 /obsidian-bridge-setup <vault-path> [<work-path>]
 ```
 
