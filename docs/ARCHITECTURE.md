@@ -7,16 +7,18 @@
 - memory / rules / skills / CLAUDE.md 真实文件物理在 vault, Claude 端通过 symlink 透传
 - plans 反之: 文件物理在 `~/.claude/plans/` (Claude Code 默认写入位置), vault 内放反向 symlink
 
+**Wiki 是 LLM-owned, 人类 review 不直接 patch.** 沿用 [Karpathy LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) 的契约: agent 的知识资产 (memory / rules / skills / CLAUDE.md) 由 agent 自身维护, 人类负责 read / nav / 指出问题, 而非手动编辑. 维度 E (memory → rules 提级) 是这个契约的体现 — 工具机械搬运, 语义抽象由 LLM 自己完成.
+
 ## 6 个白盒化维度
 
-| 维度 | 含义 | 实现 | 状态 |
-|---|---|---|---|
-| **A** 知识资产 | memory/rules/skills/CLAUDE.md | symlink 透传 | v1.0 ✅ |
-| **B** 启动加载清单 | 本次 session 实际加载了什么 | `auto-link.sh` 在 `_sessions/` 写每次启动摘要 | v1.0 ✅ |
-| **C** 决策过程 | plan 制作时引用了哪些 memory/skill | `trace-tool.sh` 收集 + `finalize-plan.sh` 写回 | v1.0 ✅ |
-| **D** 工具流水 | session 内每次工具调用 | `~/.claude/sessions/<id>/.tool-trace.jsonl` | v1.0 ✅ |
-| **E** 知识演化 | memory → rules 提级 | `/scan-memory-duplicates` + `/promote-memory` | v1.0 ✅ |
-| **F** 规则触发归因 | 哪条 rule 对这次输出起作用 | LLM 自报 + token 归因 | v2 探索 |
+| 维度 | 含义 | Karpathy 类比 (含 caveat) | 实现 | 状态 |
+|---|---|---|---|---|
+| **A** 知识资产 | memory/rules/skills/CLAUDE.md | 让 wiki + schema 从隐藏目录走到 vault 前台 — 仅 file plumbing, **非** Karpathy 语义级 ingest | symlink 透传 | v1.0 ✅ |
+| **B** 启动加载清单 | 本次 session 实际加载了什么 | log.md 的局部视图 (一文件一 session, **不是** 单一 append-only md log) | `auto-link.sh` 在 `_sessions/` 写每次启动摘要 | v1.0 ✅ |
+| **C** 决策过程 | plan 制作时引用了哪些 memory/skill | query trace 的简化形态 — 直接嵌 plan 末尾, 不是 query 答案回写为新 page | `trace-tool.sh` 收集 + `finalize-plan.sh` 写回 | v1.0 ✅ |
+| **D** 工具流水 | session 内每次工具调用 | tool-level 时间线 (jsonl 非 md, 非 Karpathy log.md 风格) | `~/.claude/sessions/<id>/.tool-trace.jsonl` | v1.0 ✅ |
+| **E** 知识演化 | memory → rules 提级 | lint pass 中"找重复 + 抽象提升"一项, **不含** 矛盾 / orphan / stale / cross-ref 检测 | `/scan-memory-duplicates` + `/promote-memory` | v1.0 ✅ |
+| **F** 规则触发归因 | 哪条 rule 对这次输出起作用 | (Karpathy 未覆盖, agent-side 特有) | LLM 自报 + token 归因 | v2 探索 |
 
 ## Hook 数据流
 
@@ -56,20 +58,20 @@ Stop  (finalize-plan.sh, 会话结束)
 ## Vault 目录布局
 
 ```
-<vault>/<vault_subdir>/                  默认 Claude/
-├── CLAUDE.md                           全局指令 (Claude 端 ~/.claude/CLAUDE.md → 此)
-├── memory/                              真实目录, 各项目物理在此
-│   └── <friendly>/MEMORY.md + companion *.md
-├── plans                                symlink → ~/.claude/plans
-├── rules/                               真实目录
+<vault>/<vault_subdir>/                  默认 Claude/ — agent wiki 根目录
+├── CLAUDE.md                           schema 层 — 全局指令 (Claude 端 ~/.claude/CLAUDE.md → 此)
+├── memory/                              wiki 层 — agent 各项目经验沉淀
+│   └── <friendly>/MEMORY.md + *.md     MEMORY.md ≈ Karpathy index.md (各项目自己的 entry 索引)
+├── plans                                symlink → ~/.claude/plans (LLM 工作产物归档)
+├── rules/                               wiki 层 — 跨项目通用约束
 │   ├── common/*.md
 │   └── <lang>/*.md
-├── skills/                              真实目录
+├── skills/                              wiki 层 — 可复用能力
 │   └── <skill-name>/SKILL.md + ...
-├── project-claudes/                     <repo>/CLAUDE.md 的反向 symlink
+├── project-claudes/                     schema 层补充 — 各仓库 CLAUDE.md 的反向 symlink
 │   └── <project-name>.md → /path/to/repo/CLAUDE.md
-├── docs/                                文档
-└── _sessions/                           每次 session 启动清单 (30 天清理)
+├── docs/                                项目自身文档
+└── _sessions/                           ≈ Karpathy log.md (每次 session 启动一条, 30 天清理)
 ```
 
 ## Symlink 方向矩阵
@@ -114,6 +116,21 @@ PostToolUse hook 仅记录"对决策有信息量"的 tool 调用. 不记录:
 - Skill 调用 (决策性, 反映 Claude 选择了哪个能力)
 - Read /memory|rules|skills|plans/ (主动加载知识)
 - Write/Edit /plans/ (产出 plan)
+
+## 与 Karpathy LLM Wiki 的 gap
+
+ARCHITECTURE 引入了 Karpathy 词汇, 但 v1.0 实现并未完整 cover Karpathy pattern. 差异:
+
+1. **没有单一 `log.md`** — `_sessions/` 一文件一 session. 跨 session 时间线视图缺失. Karpathy 那种"统一前缀 + grep tail"的能力本项目不具备.
+2. **没有完整 lint** — 维度 E 仅做跨项目 token Jaccard 相似度. 矛盾对检测 / orphan page / stale claim / 缺失 cross-ref / data gap 建议都未实现.
+3. **没有 ingest 流水** — Karpathy 的 ingest = LLM 读源 + 抽取实体 + 整合到 entity / concept 页 + 更新 index + append log. 本项目维度 A 只是 file plumbing (symlink). 实际写 memory 由 Claude 在 session 内手动完成, plugin 不参与.
+4. **没有 query 入口** — Karpathy 强调"好 query 的答案应该 file 回 wiki 成新 page". 本项目无 query / writeback 工具.
+5. **没有 vault 内 schema 文档** — 缺一份描述"如何维护这份 agent wiki"的协议. memory format 由 Claude 系统级 prompt 隐式定义, 不在 vault 里显式.
+
+v2 roadmap 建议优先补:
+- 单一 `_log.md` 汇总 (跨 session 时间线, Karpathy 风格前缀)
+- lint 维度扩展 (至少 "orphan 页 + missing cross-ref")
+- 一份 vault 内 schema 文档 (描述本项目自己的 wiki maintenance protocol)
 
 ## 风险与边界
 
