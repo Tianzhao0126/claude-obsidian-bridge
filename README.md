@@ -19,11 +19,13 @@ AI agent (Claude Code) 默认是**黑盒**:
 ## 安装
 
 ```
-/plugin install Tianzhao0126/claude-obsidian-bridge
+/plugin marketplace add Tianzhao0126/claude-obsidian-bridge
+/plugin install claude-obsidian-bridge@claude-obsidian-bridge
+/reload-plugins
 /obsidian-bridge-setup <vault-path> [<work-path>]
 ```
 
-不传参数则交互式询问. 重启 Claude Code 后 hook 生效.
+`/obsidian-bridge-setup` 不传参数则交互式询问. 启动新 session 时 SessionStart hook 才会对当前 cwd 建 memory symlink + 写启动清单.
 
 ## 4 个核心能力
 
